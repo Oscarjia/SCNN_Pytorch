@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
-
+from torchvision.models.vgg import VGG16_BN_Weights
 
 class SCNN(nn.Module):
     def __init__(
@@ -26,7 +26,7 @@ class SCNN(nn.Module):
         self.scale_exist = 0.1
 
         self.ce_loss = nn.CrossEntropyLoss(weight=torch.tensor([self.scale_background, 1, 1, 1, 1]))
-        self.bce_loss = nn.BCELoss()
+        self.bce_loss = nn.BCEWithLogitsLoss()
 
     def forward(self, img, seg_gt=None, exist_gt=None):
         x = self.backbone(img)
@@ -47,6 +47,11 @@ class SCNN(nn.Module):
             loss_seg = torch.tensor(0, dtype=img.dtype, device=img.device)
             loss_exist = torch.tensor(0, dtype=img.dtype, device=img.device)
             loss = torch.tensor(0, dtype=img.dtype, device=img.device)
+            print(f"warning....loss_seg:{loss_seg},loss_exist:{loss_exist},loss:{loss}")
+
+        
+        print(f"return....loss_seg:{loss_seg},loss_exist:{loss_exist},loss:{loss}")
+        
 
         return seg_pred, exist_pred, loss_seg, loss_exist, loss
 
@@ -85,19 +90,24 @@ class SCNN(nn.Module):
     def net_init(self, input_size, ms_ks):
         input_w, input_h = input_size
         self.fc_input_feature = 5 * int(input_w/16) * int(input_h/16)
-        self.backbone = models.vgg16_bn(pretrained=self.pretrained).features
+         # Use the new API to load the pretrained weights
+        if self.pretrained:
+            vgg = models.vgg16_bn(weights=VGG16_BN_Weights.IMAGENET1K_V1)
+        else:
+            vgg = models.vgg16_bn(weights=None)
 
         # ----------------- process backbone -----------------
-        for i in [34, 37, 40]:
-            conv = self.backbone._modules[str(i)]
-            dilated_conv = nn.Conv2d(
-                conv.in_channels, conv.out_channels, conv.kernel_size, stride=conv.stride,
-                padding=tuple(p * 2 for p in conv.padding), dilation=2, bias=(conv.bias is not None)
-            )
-            dilated_conv.load_state_dict(conv.state_dict())
-            self.backbone._modules[str(i)] = dilated_conv
-        self.backbone._modules.pop('33')
-        self.backbone._modules.pop('43')
+        backbone_layers = []
+        for i, layer in enumerate(vgg.features):
+            if i in [34, 37, 40]:
+                    conv = layer
+                    dilated_conv = nn.Conv2d(conv.in_channels, conv.out_channels, conv.kernel_size, stride=conv.stride,padding=tuple(p * 2 for p in conv.padding), dilation=2, bias=(conv.bias is not None))
+                    dilated_conv.load_state_dict(conv.state_dict())
+                    backbone_layers.append(dilated_conv)
+            elif i not in [33, 43]:
+                 backbone_layers.append(layer)
+                 
+        self.backbone = nn.Sequential(*backbone_layers)
 
         # ----------------- SCNN part -----------------
         self.layer1 = nn.Sequential(
@@ -132,8 +142,8 @@ class SCNN(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(self.fc_input_feature, 128),
             nn.ReLU(),
-            nn.Linear(128, 4),
-            nn.Sigmoid()
+            nn.Linear(128, 4)
+            # nn.Sigmoid()
         )
 
     def weight_init(self):

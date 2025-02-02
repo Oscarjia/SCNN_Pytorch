@@ -108,6 +108,8 @@ class Rotation(CustomTransform):
     def __call__(self, sample):
         img = sample.get('img')
         segLabel = sample.get('segLabel', None)
+        
+        print(f"Rotation shape:{img.shape},segLabel:{segLabel}")
 
         u = np.random.uniform()
         degree = (u-0.5) * self.theta

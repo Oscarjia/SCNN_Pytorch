@@ -1,6 +1,6 @@
 {
   "device": "cuda:0",
-  "MAX_EPOCHES": 60,
+  "MAX_EPOCHES": 3,
 
   "dataset": {
     "dataset_name": "Tusimple",
@@ -9,7 +9,7 @@
   },
 
   "optim": {
-    "lr": 15e-2,
+    "lr": 1e-5,
     "momentum": 0.9,
     "weight_decay": 1e-4,
     "nesterov": true

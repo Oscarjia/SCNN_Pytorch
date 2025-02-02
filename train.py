@@ -1,3 +1,4 @@
+# python train.py --exp_dir ./experiments/exp0
 import argparse
 import json
 import os
@@ -32,6 +33,7 @@ exp_name = exp_dir.split('/')[-1]
 
 with open(os.path.join(exp_dir, "cfg.json")) as f:
     exp_cfg = json.load(f)
+#   "resize_shape": [512, 288]
 resize_shape = tuple(exp_cfg['dataset']['resize_shape'])
 
 device = torch.device(exp_cfg['device'])
@@ -79,15 +81,26 @@ def train(epoch):
     for batch_idx, sample in enumerate(train_loader):
         img = sample['img'].to(device)
         segLabel = sample['segLabel'].to(device)
+        print(f"segLabel:{segLabel}")
         exist = sample['exist'].to(device)
+        print(f"exist:{exist}")
+
+        print(f"train data {img.shape},seglabel shape:{segLabel.shape},exist shape:{exist.shape}")
+        if torch.isnan(img).any() or torch.isinf(img).any():
+            print("数据中存在无效值！")
 
         optimizer.zero_grad()
         seg_pred, exist_pred, loss_seg, loss_exist, loss = net(img, segLabel, exist)
+        print("Segmentation Loss:", loss_seg.item())
+        print("Existence Loss:", loss_exist.item())
+        print("Total Loss:", loss.item())
         if isinstance(net, torch.nn.DataParallel):
             loss_seg = loss_seg.sum()
             loss_exist = loss_exist.sum()
             loss = loss.sum()
         loss.backward()
+        # 梯度裁剪
+        torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=10.0)  # 新增
         optimizer.step()
         lr_scheduler.step()
 

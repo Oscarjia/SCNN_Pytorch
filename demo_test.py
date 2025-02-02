@@ -6,10 +6,10 @@ from model import SCNN
 from utils.prob2lines import getLane
 from utils.transforms import *
 
-net = SCNN(input_size=(800, 288), pretrained=False)
+net = SCNN(input_size=(512, 288), pretrained=False)
 mean=(0.3598, 0.3653, 0.3662) # CULane mean, std
 std=(0.2573, 0.2663, 0.2756)
-transform_img = Resize((800, 288))
+transform_img = Resize((512, 288))
 transform_to_net = Compose(ToTensor(), Normalize(mean=mean, std=std))
 
 
@@ -42,6 +42,7 @@ def main():
     exist_pred = exist_pred.detach().cpu().numpy()
     seg_pred = seg_pred[0]
     exist = [1 if exist_pred[0, i] > 0.5 else 0 for i in range(4)]
+    print(f"seg_pred:{seg_pred},exist:{exist}")
 
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     lane_img = np.zeros_like(img)
